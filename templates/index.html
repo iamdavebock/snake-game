@@ -1,0 +1,141 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Snake</title>
+    <link rel="stylesheet" href="/static/style.css" />
+</head>
+<body>
+    <h1>Snake</h1>
+    <div id="score-display">Score: <span id="score">0</span></div>
+
+    <div id="game-wrapper">
+        <canvas id="board" width="400" height="400"></canvas>
+
+        <div id="dead">
+            <h2>GAME OVER</h2>
+            <div class="final-score">Score: <span id="final-score">0</span></div>
+            <p>Press R to restart</p>
+        </div>
+    </div>
+
+    <script src="https://cdn.socket.io/4.7.5/socket.io.min.js"></script>
+    <script>
+        const GRID = 20;
+        const CELL = 400 / GRID; // 20px per cell
+
+        const canvas = document.getElementById("board");
+        const ctx = canvas.getContext("2d");
+        const scoreEl = document.getElementById("score");
+        const finalScoreEl = document.getElementById("final-score");
+        const deadEl = document.getElementById("dead");
+
+        const socket = io();
+
+        // ---- Drawing helpers ----
+
+        function drawGrid() {
+            ctx.strokeStyle = "rgba(255,255,255,0.04)";
+            ctx.lineWidth = 0.5;
+            for (let i = 0; i <= GRID; i++) {
+                const pos = i * CELL;
+                ctx.beginPath();
+                ctx.moveTo(pos, 0);
+                ctx.lineTo(pos, 400);
+                ctx.stroke();
+                ctx.beginPath();
+                ctx.moveTo(0, pos);
+                ctx.lineTo(400, pos);
+                ctx.stroke();
+            }
+        }
+
+        function drawCell(x, y, color) {
+            const px = x * CELL;
+            const py = y * CELL;
+            ctx.fillStyle = color;
+            ctx.fillRect(px + 1, py + 1, CELL - 2, CELL - 2);
+        }
+
+        function render(state) {
+            // Background
+            ctx.fillStyle = "#0d0d1a";
+            ctx.fillRect(0, 0, 400, 400);
+
+            drawGrid();
+
+            // Snake body
+            state.snake.forEach((seg, i) => {
+                const color = i === 0 ? "#00ffaa" : "#00cc66";
+                drawCell(seg[0], seg[1], color);
+
+                // Head highlight
+                if (i === 0) {
+                    ctx.fillStyle = "rgba(255,255,255,0.18)";
+                    const px = seg[0] * CELL + 2;
+                    const py = seg[1] * CELL + 2;
+                    const s = CELL * 0.35;
+                    ctx.fillRect(px, py, s, s);
+                }
+            });
+
+            // Food
+            if (state.food) {
+                const [fx, fy] = state.food;
+                const cx = fx * CELL + CELL / 2;
+                const cy = fy * CELL + CELL / 2;
+                const r = CELL / 2 - 2;
+
+                ctx.beginPath();
+                ctx.arc(cx, cy, r, 0, Math.PI * 2);
+                ctx.fillStyle = "#ff4444";
+                ctx.fill();
+
+                // Shine
+                ctx.beginPath();
+                ctx.arc(cx - r * 0.25, cy - r * 0.25, r * 0.3, 0, Math.PI * 2);
+                ctx.fillStyle = "rgba(255,255,255,0.35)";
+                ctx.fill();
+            }
+
+            // Score
+            scoreEl.textContent = state.score;
+
+            // Game over overlay
+            if (!state.alive) {
+                finalScoreEl.textContent = state.score;
+                deadEl.classList.add("visible");
+            }
+        }
+
+        // ---- Socket events ----
+
+        socket.on("game_state", (state) => {
+            render(state);
+        });
+
+        // ---- Keyboard input ----
+
+        const KEY_MAP = {
+            ArrowUp:    "UP",
+            ArrowDown:  "DOWN",
+            ArrowLeft:  "LEFT",
+            ArrowRight: "RIGHT",
+        };
+
+        document.addEventListener("keydown", (e) => {
+            if (KEY_MAP[e.key]) {
+                e.preventDefault();
+                socket.emit("move", { direction: KEY_MAP[e.key] });
+                return;
+            }
+            if (e.key === "r" || e.key === "R") {
+                deadEl.classList.remove("visible");
+                scoreEl.textContent = "0";
+                socket.emit("restart");
+            }
+        });
+    </script>
+</body>
+</html>
