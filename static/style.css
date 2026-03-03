@@ -123,3 +123,29 @@ h1 {
         display: flex;
     }
 }
+
+#footer {
+    margin-top: 1.4rem;
+    font-size: 0.78rem;
+    letter-spacing: 0.1em;
+    color: #555577;
+}
+
+#footer a {
+    color: #00cc66;
+    text-decoration: none;
+    transition: color 0.2s;
+}
+
+#footer a:hover {
+    color: #00ff88;
+}
+
+#footer .divider {
+    margin: 0 0.6em;
+    color: #333355;
+}
+
+#footer .built {
+    color: #444466;
+}
