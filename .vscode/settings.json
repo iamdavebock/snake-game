@@ -1,0 +1,15 @@
+{
+  "terminal.integrated.defaultProfile.linux": "Claude — snake-game",
+  "terminal.integrated.profiles.linux": {
+    "Claude — snake-game": {
+      "path": "bash",
+      "args": ["-c", "ember-session attach snake-game"],
+      "icon": "flame",
+      "color": "terminal.ansiMagenta"
+    }
+  },
+  "terminal.integrated.defaultLocation": "editor",
+  "terminal.integrated.persistentSessionReviveProcess": "never",
+  "remote.SSH.serverPickScope": "workspace",
+  "task.allowAutomaticTasks": "on"
+}

@@ -1,0 +1,24 @@
+{
+  "hooks": {
+    "UserPromptSubmit": [
+      {
+        "hooks": [
+          {
+            "type": "command",
+            "command": "bash -c 'FLAG=\"/tmp/.ember_$(echo \"$PWD\" | md5sum | cut -c1-8)\"; if [ ! -f \"$FLAG\" ] && [ -f \"SESSION.md\" ]; then touch \"$FLAG\"; echo \"<session-context>\"; cat SESSION.md; echo \"</session-context>\"; fi'"
+          }
+        ]
+      }
+    ],
+    "Stop": [
+      {
+        "hooks": [
+          {
+            "type": "command",
+            "command": "bash -c 'if [ -f \"SESSION.md\" ]; then echo \"Run /session-end to update SESSION.md and commit.\"; fi'"
+          }
+        ]
+      }
+    ]
+  }
+}
