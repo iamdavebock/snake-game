@@ -35,5 +35,7 @@ def game_loop():
 
 
 if __name__ == "__main__":
+    import os
+    port = int(os.environ.get("PORT", 5050))
     socketio.start_background_task(game_loop)
-    socketio.run(app, host="0.0.0.0", port=5050)
+    socketio.run(app, host="0.0.0.0", port=port)
