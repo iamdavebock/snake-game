@@ -82,3 +82,44 @@ h1 {
     font-size: 1.2rem;
     color: #00ff88;
 }
+
+/* Mobile controls */
+#mobile-controls {
+    display: none;
+    flex-direction: column;
+    align-items: center;
+    gap: 0.4rem;
+    margin-top: 1.2rem;
+}
+
+.ctrl-row {
+    display: flex;
+    gap: 0.4rem;
+}
+
+.ctrl-btn {
+    width: 56px;
+    height: 56px;
+    background: #1a1a3a;
+    border: 1px solid #2a2a5a;
+    border-radius: 8px;
+    color: #00ff88;
+    font-size: 1.4rem;
+    cursor: pointer;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    transition: background 0.1s;
+    -webkit-tap-highlight-color: transparent;
+    touch-action: manipulation;
+}
+
+.ctrl-btn:active {
+    background: #2a2a5a;
+}
+
+@media (pointer: coarse) {
+    #mobile-controls {
+        display: flex;
+    }
+}

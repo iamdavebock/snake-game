@@ -20,10 +20,22 @@
         </div>
     </div>
 
-    <script src="https://cdn.socket.io/4.7.5/socket.io.min.js"></script>
+    <!-- Mobile controls -->
+    <div id="mobile-controls">
+        <div class="ctrl-row">
+            <button class="ctrl-btn" data-dir="UP">&#9650;</button>
+        </div>
+        <div class="ctrl-row">
+            <button class="ctrl-btn" data-dir="LEFT">&#9664;</button>
+            <button class="ctrl-btn" data-dir="DOWN">&#9660;</button>
+            <button class="ctrl-btn" data-dir="RIGHT">&#9654;</button>
+        </div>
+    </div>
+
     <script>
         const GRID = 20;
         const CELL = 400 / GRID; // 20px per cell
+        const TICK_MS = 120;
 
         const canvas = document.getElementById("board");
         const ctx = canvas.getContext("2d");
@@ -31,9 +43,91 @@
         const finalScoreEl = document.getElementById("final-score");
         const deadEl = document.getElementById("dead");
 
-        const socket = io();
+        // ---- Game state ----
 
-        // ---- Drawing helpers ----
+        let snake, dir, nextDir, dirQueue, food, score, alive, intervalId;
+
+        const OPPOSITE = { UP: "DOWN", DOWN: "UP", LEFT: "RIGHT", RIGHT: "LEFT" };
+        const DELTA = {
+            UP:    [0, -1],
+            DOWN:  [0,  1],
+            LEFT:  [-1, 0],
+            RIGHT: [1,  0],
+        };
+
+        function randomFood(snake) {
+            const occupied = new Set(snake.map(([x, y]) => `${x},${y}`));
+            let x, y;
+            do {
+                x = Math.floor(Math.random() * GRID);
+                y = Math.floor(Math.random() * GRID);
+            } while (occupied.has(`${x},${y}`));
+            return [x, y];
+        }
+
+        function initGame() {
+            const startX = 10, startY = 10;
+            snake = [[startX, startY], [startX - 1, startY], [startX - 2, startY]];
+            dir = "RIGHT";
+            nextDir = "RIGHT";
+            dirQueue = [];
+            food = randomFood(snake);
+            score = 0;
+            alive = true;
+            scoreEl.textContent = "0";
+            deadEl.classList.remove("visible");
+        }
+
+        function applyNextDir() {
+            if (dirQueue.length > 0) {
+                const candidate = dirQueue.shift();
+                // Ignore 180-degree reversals
+                if (candidate !== OPPOSITE[dir]) {
+                    dir = candidate;
+                }
+            }
+        }
+
+        function tick() {
+            if (!alive) return;
+
+            applyNextDir();
+
+            const [dx, dy] = DELTA[dir];
+            const head = snake[0];
+            const newHead = [head[0] + dx, head[1] + dy];
+
+            // Wall collision
+            if (newHead[0] < 0 || newHead[0] >= GRID || newHead[1] < 0 || newHead[1] >= GRID) {
+                alive = false;
+                render();
+                return;
+            }
+
+            // Self collision (exclude tail — it moves away this tick)
+            for (let i = 0; i < snake.length - 1; i++) {
+                if (snake[i][0] === newHead[0] && snake[i][1] === newHead[1]) {
+                    alive = false;
+                    render();
+                    return;
+                }
+            }
+
+            snake.unshift(newHead);
+
+            // Food check
+            if (newHead[0] === food[0] && newHead[1] === food[1]) {
+                score += 10;
+                scoreEl.textContent = score;
+                food = randomFood(snake);
+            } else {
+                snake.pop();
+            }
+
+            render();
+        }
+
+        // ---- Drawing ----
 
         function drawGrid() {
             ctx.strokeStyle = "rgba(255,255,255,0.04)";
@@ -51,91 +145,97 @@
             }
         }
 
-        function drawCell(x, y, color) {
-            const px = x * CELL;
-            const py = y * CELL;
-            ctx.fillStyle = color;
-            ctx.fillRect(px + 1, py + 1, CELL - 2, CELL - 2);
-        }
-
-        function render(state) {
+        function render() {
             // Background
             ctx.fillStyle = "#0d0d1a";
             ctx.fillRect(0, 0, 400, 400);
 
             drawGrid();
 
-            // Snake body
-            state.snake.forEach((seg, i) => {
-                const color = i === 0 ? "#00ffaa" : "#00cc66";
-                drawCell(seg[0], seg[1], color);
+            // Snake
+            snake.forEach(([x, y], i) => {
+                const px = x * CELL;
+                const py = y * CELL;
+                ctx.fillStyle = i === 0 ? "#00ffaa" : "#00cc66";
+                ctx.fillRect(px + 1, py + 1, CELL - 2, CELL - 2);
 
                 // Head highlight
                 if (i === 0) {
                     ctx.fillStyle = "rgba(255,255,255,0.18)";
-                    const px = seg[0] * CELL + 2;
-                    const py = seg[1] * CELL + 2;
-                    const s = CELL * 0.35;
-                    ctx.fillRect(px, py, s, s);
+                    ctx.fillRect(px + 2, py + 2, CELL * 0.35, CELL * 0.35);
                 }
             });
 
             // Food
-            if (state.food) {
-                const [fx, fy] = state.food;
-                const cx = fx * CELL + CELL / 2;
-                const cy = fy * CELL + CELL / 2;
-                const r = CELL / 2 - 2;
+            const [fx, fy] = food;
+            const cx = fx * CELL + CELL / 2;
+            const cy = fy * CELL + CELL / 2;
+            const r = CELL / 2 - 2;
 
-                ctx.beginPath();
-                ctx.arc(cx, cy, r, 0, Math.PI * 2);
-                ctx.fillStyle = "#ff4444";
-                ctx.fill();
+            ctx.beginPath();
+            ctx.arc(cx, cy, r, 0, Math.PI * 2);
+            ctx.fillStyle = "#ff4444";
+            ctx.fill();
 
-                // Shine
-                ctx.beginPath();
-                ctx.arc(cx - r * 0.25, cy - r * 0.25, r * 0.3, 0, Math.PI * 2);
-                ctx.fillStyle = "rgba(255,255,255,0.35)";
-                ctx.fill();
-            }
-
-            // Score
-            scoreEl.textContent = state.score;
+            // Shine dot
+            ctx.beginPath();
+            ctx.arc(cx - r * 0.25, cy - r * 0.25, r * 0.3, 0, Math.PI * 2);
+            ctx.fillStyle = "rgba(255,255,255,0.35)";
+            ctx.fill();
 
             // Game over overlay
-            if (!state.alive) {
-                finalScoreEl.textContent = state.score;
+            if (!alive) {
+                finalScoreEl.textContent = score;
                 deadEl.classList.add("visible");
             }
         }
 
-        // ---- Socket events ----
+        // ---- Input ----
 
-        socket.on("game_state", (state) => {
-            render(state);
-        });
-
-        // ---- Keyboard input ----
-
-        const KEY_MAP = {
-            ArrowUp:    "UP",
-            ArrowDown:  "DOWN",
-            ArrowLeft:  "LEFT",
-            ArrowRight: "RIGHT",
-        };
+        function queueDir(newDir) {
+            // Only buffer one pending direction change
+            const last = dirQueue.length > 0 ? dirQueue[dirQueue.length - 1] : dir;
+            if (newDir !== last && newDir !== OPPOSITE[last]) {
+                if (dirQueue.length < 1) {
+                    dirQueue.push(newDir);
+                }
+            }
+        }
 
         document.addEventListener("keydown", (e) => {
-            if (KEY_MAP[e.key]) {
+            const map = {
+                ArrowUp: "UP", ArrowDown: "DOWN",
+                ArrowLeft: "LEFT", ArrowRight: "RIGHT",
+            };
+            if (map[e.key]) {
                 e.preventDefault();
-                socket.emit("move", { direction: KEY_MAP[e.key] });
+                queueDir(map[e.key]);
                 return;
             }
             if (e.key === "r" || e.key === "R") {
-                deadEl.classList.remove("visible");
-                scoreEl.textContent = "0";
-                socket.emit("restart");
+                restart();
             }
         });
+
+        // Mobile buttons
+        document.querySelectorAll(".ctrl-btn").forEach((btn) => {
+            btn.addEventListener("click", () => {
+                const d = btn.dataset.dir;
+                if (d) queueDir(d);
+            });
+        });
+
+        function restart() {
+            clearInterval(intervalId);
+            initGame();
+            render();
+            intervalId = setInterval(tick, TICK_MS);
+        }
+
+        // ---- Start ----
+        initGame();
+        render();
+        intervalId = setInterval(tick, TICK_MS);
     </script>
 </body>
 </html>
