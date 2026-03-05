@@ -43,9 +43,9 @@
         const CELL = 400 / GRID; // 20px per cell
 
         // Speed settings
-        const TICK_START  = 200;  // ms — initial (slow)
-        const TICK_STEP   = 5;    // ms reduction per apple
-        const TICK_MIN    = 80;   // ms — fastest allowed
+        const TICK_START  = 200;  // ms — initial
+        const TICK_STEP   = 5;    // ms increase per apple (gets slower)
+        const TICK_MAX    = 400;  // ms — slowest allowed
 
         const canvas = document.getElementById("board");
         const ctx = canvas.getContext("2d");
@@ -134,7 +134,7 @@
                 food = randomFood(snake);
 
                 // Speed up — restart interval at new tick rate
-                currentTick = Math.max(TICK_MIN, currentTick - TICK_STEP);
+                currentTick = Math.min(TICK_MAX, currentTick + TICK_STEP);
                 clearInterval(intervalId);
                 intervalId = setInterval(tick, currentTick);
             } else {
