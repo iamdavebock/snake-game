@@ -16,7 +16,7 @@
         <div id="dead">
             <h2>GAME OVER</h2>
             <div class="final-score">Score: <span id="final-score">0</span></div>
-            <p>Press R to restart</p>
+            <p>Press SPACE to restart</p>
         </div>
     </div>
 
@@ -41,7 +41,11 @@
     <script>
         const GRID = 20;
         const CELL = 400 / GRID; // 20px per cell
-        const TICK_MS = 120;
+
+        // Speed settings
+        const TICK_START  = 200;  // ms — initial (slow)
+        const TICK_STEP   = 5;    // ms reduction per apple
+        const TICK_MIN    = 80;   // ms — fastest allowed
 
         const canvas = document.getElementById("board");
         const ctx = canvas.getContext("2d");
@@ -51,7 +55,9 @@
 
         // ---- Game state ----
 
-        let snake, dir, nextDir, dirQueue, food, score, alive, intervalId;
+        // gameState: 'waiting' | 'playing' | 'dead'
+        let gameState = 'waiting';
+        let snake, dir, nextDir, dirQueue, food, score, intervalId, currentTick;
 
         const OPPOSITE = { UP: "DOWN", DOWN: "UP", LEFT: "RIGHT", RIGHT: "LEFT" };
         const DELTA = {
@@ -79,7 +85,7 @@
             dirQueue = [];
             food = randomFood(snake);
             score = 0;
-            alive = true;
+            currentTick = TICK_START;
             scoreEl.textContent = "0";
             deadEl.classList.remove("visible");
         }
@@ -95,7 +101,7 @@
         }
 
         function tick() {
-            if (!alive) return;
+            if (gameState !== 'playing') return;
 
             applyNextDir();
 
@@ -105,7 +111,7 @@
 
             // Wall collision
             if (newHead[0] < 0 || newHead[0] >= GRID || newHead[1] < 0 || newHead[1] >= GRID) {
-                alive = false;
+                gameState = 'dead';
                 render();
                 return;
             }
@@ -113,7 +119,7 @@
             // Self collision (exclude tail — it moves away this tick)
             for (let i = 0; i < snake.length - 1; i++) {
                 if (snake[i][0] === newHead[0] && snake[i][1] === newHead[1]) {
-                    alive = false;
+                    gameState = 'dead';
                     render();
                     return;
                 }
@@ -126,6 +132,11 @@
                 score += 10;
                 scoreEl.textContent = score;
                 food = randomFood(snake);
+
+                // Speed up — restart interval at new tick rate
+                currentTick = Math.max(TICK_MIN, currentTick - TICK_STEP);
+                clearInterval(intervalId);
+                intervalId = setInterval(tick, currentTick);
             } else {
                 snake.pop();
             }
@@ -151,7 +162,42 @@
             }
         }
 
+        function drawReadyScreen() {
+            // Background
+            ctx.fillStyle = "#0d0d1a";
+            ctx.fillRect(0, 0, 400, 400);
+
+            drawGrid();
+
+            // Overlay
+            ctx.fillStyle = "rgba(10, 10, 20, 0.75)";
+            ctx.fillRect(0, 0, 400, 400);
+
+            // Title
+            ctx.fillStyle = "#00ffaa";
+            ctx.font = "bold 52px 'Courier New', Courier, monospace";
+            ctx.textAlign = "center";
+            ctx.textBaseline = "middle";
+            ctx.shadowColor = "#00ff8866";
+            ctx.shadowBlur = 18;
+            ctx.fillText("SNAKE", 200, 160);
+
+            // Prompt
+            ctx.shadowBlur = 0;
+            ctx.fillStyle = "#aaaacc";
+            ctx.font = "16px 'Courier New', Courier, monospace";
+            ctx.fillText("Press SPACE to start", 200, 240);
+
+            // Reset shadow
+            ctx.shadowBlur = 0;
+        }
+
         function render() {
+            if (gameState === 'waiting') {
+                drawReadyScreen();
+                return;
+            }
+
             // Background
             ctx.fillStyle = "#0d0d1a";
             ctx.fillRect(0, 0, 400, 400);
@@ -190,7 +236,7 @@
             ctx.fill();
 
             // Game over overlay
-            if (!alive) {
+            if (gameState === 'dead') {
                 finalScoreEl.textContent = score;
                 deadEl.classList.add("visible");
             }
@@ -208,18 +254,34 @@
             }
         }
 
+        function startGame() {
+            clearInterval(intervalId);
+            initGame();
+            gameState = 'playing';
+            render();
+            intervalId = setInterval(tick, currentTick);
+        }
+
         document.addEventListener("keydown", (e) => {
             const map = {
                 ArrowUp: "UP", ArrowDown: "DOWN",
                 ArrowLeft: "LEFT", ArrowRight: "RIGHT",
             };
-            if (map[e.key]) {
+
+            if (e.key === " ") {
                 e.preventDefault();
-                queueDir(map[e.key]);
+                if (gameState === 'waiting' || gameState === 'dead') {
+                    startGame();
+                }
                 return;
             }
-            if (e.key === "r" || e.key === "R") {
-                restart();
+
+            if (map[e.key]) {
+                e.preventDefault();
+                if (gameState === 'playing') {
+                    queueDir(map[e.key]);
+                }
+                return;
             }
         });
 
@@ -227,21 +289,12 @@
         document.querySelectorAll(".ctrl-btn").forEach((btn) => {
             btn.addEventListener("click", () => {
                 const d = btn.dataset.dir;
-                if (d) queueDir(d);
+                if (d && gameState === 'playing') queueDir(d);
             });
         });
 
-        function restart() {
-            clearInterval(intervalId);
-            initGame();
-            render();
-            intervalId = setInterval(tick, TICK_MS);
-        }
-
-        // ---- Start ----
-        initGame();
+        // ---- Init — show ready screen only ----
         render();
-        intervalId = setInterval(tick, TICK_MS);
     </script>
 </body>
 </html>
